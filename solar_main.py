@@ -6,9 +6,15 @@ from tkinter.filedialog import askopenfilename, asksaveasfilename
 import solar_vis
 import solar_model
 import solar_input
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Quantities:
+    """
+    Это класс, который хранит в себе значения глобальных переменнных
+    """
+
     def __init__(self):
         self.physical_time = 0
         self.displayed_time = 0
@@ -20,6 +26,19 @@ class Quantities:
         self.save_file_button = 0
         self.perform_execution = False
         self.space_objects = []
+
+
+def write_statistics(quantities_class):
+    """
+    Функция записывает в файл значения координаты и скорости спутника
+    :param quantities_class: объект класса Quantities
+    """
+    write_line = ""
+    obj = quantities_class.space_objects[1]
+    write_line += str(quantities_class.displayed_time.get()) + " " + str(obj.x) + " " + str(obj.y) + " " + str(
+        obj.Vx) + " " + str(obj.Vy) + "\n"
+    with open("stats.txt", 'a') as out_file:
+        out_file.write(write_line)
 
 
 def execution(quantities_class, scale_factor_class):
@@ -38,6 +57,8 @@ def execution(quantities_class, scale_factor_class):
         solar_vis.update_object_position(quantities_class.space, body, scale_factor_class)
     quantities_class.physical_time += quantities_class.time_step.get()
     quantities_class.displayed_time.set("%.1f" % quantities_class.physical_time + " seconds gone")
+
+    write_statistics(quantities_class)
 
     if quantities_class.perform_execution:
         quantities_class.space.after(101 - int(quantities_class.time_speed.get()),
@@ -195,6 +216,9 @@ def main(quantities_class, scale_factor_class):
 
     print('Modelling started!')
 
+    with open("stats.txt", 'w'):
+        pass
+
     root = tkinter.Tk()
 
     frame = tkinter.Frame(root)
@@ -211,7 +235,55 @@ def main(quantities_class, scale_factor_class):
     print('Modelling finished!')
 
 
+def read_statistics():
+    """
+    Функция считывает данные из файла
+    """
+    parameters = open('stats.txt', 'r')
+    time_array = x_array = y_array = vx_array = vy_array = np.array([])
+    data = parameters.readlines()
+
+    for line in data:
+        array = [i for i in line.split()]
+        time_array = np.append(time_array, float(array[0]))
+        x_array = np.append(x_array, float(array[3]))
+        y_array = np.append(y_array, float(array[4]))
+        vx_array = np.append(vx_array, float(array[5]))
+        vy_array = np.append(vy_array, float(array[6]))
+
+    parameters.close()
+
+    return time_array, x_array, y_array, vx_array, vy_array
+
+
+def print_graph():
+    """
+    Функция строит графики по считанным данным
+    """
+    time_array, x_array, y_array, vx_array, vy_array = read_statistics()
+    fig_1, ax_1 = plt.subplots()
+    ax_1.plot(time_array, np.sqrt(vx_array ** 2 + vy_array ** 2))
+    ax_1.set_title("График зависимости модуля скорости планеты от времени")
+    ax_1.set_xlabel("Время, c")
+    ax_1.set_ylabel("Скорость, м/c")
+
+    fig_2, ax_2 = plt.subplots()
+    ax_2.plot(time_array, np.sqrt(x_array ** 2 + y_array ** 2))
+    ax_2.set_title("График зависимости расстояния спутник-планета от времени")
+    ax_2.set_xlabel("Время, c")
+    ax_2.set_ylabel("Расстояние, м")
+
+    fig_3, ax_3 = plt.subplots()
+    ax_3.plot(np.sqrt(x_array ** 2 + y_array ** 2), np.sqrt(vx_array ** 2 + vy_array ** 2))
+    ax_3.set_title("График зависимости расстояния спутник-планета \n от модуля скорости планеты")
+    ax_3.set_xlabel("Расстояние, м")
+    ax_3.set_ylabel("Скорость, м/c")
+
+    plt.show()
+
+
 if __name__ == "__main__":
     quantities = Quantities()
     scale_factor = solar_vis.ScaleFactor()
     main(quantities, scale_factor)
+    print_graph()
